@@ -6,6 +6,8 @@
 - `upstream`= `https://github.com/Tencent-Hunyuan/Hy-Memory.git`（只 fetch，不 push）
 - 工作区 `sparse-checkout = memhub plugins`（`plugins/` 是 host-bridge 构建必需，见下）
 
+> 谁要改代码，先读仓库根的 **`AGENTS.md`**：那里列了天枢的四条链路、每个接线段被破坏后的症状、三条硬约束和验证命令。本文档只负责构建/发行/升级的完整流程。
+
 ## 改动概览
 
 | 层 | 文件 | 改动 |
