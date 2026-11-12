@@ -236,6 +236,15 @@ export interface RecallHostLayout {
     | "openclaw"
     | "codebuddy-plugin"
     | "none";
+  /** Where a JSON config keeps its server map, when it is not the top-level
+   * `mcpServers`.
+   *
+   * Read off the host rather than assumed: 天枢 (Rivet) keeps
+   * `{ command, args, env }` entries one level down, under `mcp.servers`, the
+   * same nesting OpenClaw uses — but with a plain JSON config otherwise, so it
+   * needs the path without needing a format of its own.
+   */
+  serversPath?: readonly string[];
   /** Set for a host installed as a self-contained plugin rather than as an
    * entry in a config file it shares with the user's own settings.
    *
@@ -785,18 +794,24 @@ export function piLayout(piDir: string): RecallHostLayout {
   };
 }
 
-/** 天枢 (Rivet) keeps its MCP config inside the desktop app bundle and exposes
- * no file the installer can safely merge, so it is listed as present without a
- * config target — the same shape as Pi. Recall already reaches it through the
- * host's own MCP pairing; this entry makes the host visible in `memhub host
- * list` and reserves the id used for source attribution. */
+/** 天枢 (Rivet) keeps its MCP servers in `~/.rivet/config.json`, under
+ * `mcp.servers`, as plain `{ command, args, env }` entries — the same shape
+ * every other MCP host here uses, one level down.
+ *
+ * Read off the install on this machine: the host's own settings page writes
+ * exactly that path, and the entry it wrote for us carried our
+ * `ONE_MEMORY_MANAGED_BY` marker, so this is a normal merge into a file the
+ * host also owns rather than a host we can only observe. Skills live at
+ * `~/.rivet/skills/<name>/SKILL.md`.
+ */
 export function tianshuLayout(rivetDir: string): RecallHostLayout {
   const root = path.resolve(rivetDir);
   return {
     hostId: "tianshu",
     hostLabel: "天枢",
-    configPath: null,
-    format: "none",
+    configPath: path.join(root, "config.json"),
+    format: "json",
+    serversPath: ["mcp", "servers"],
     channel: "mcp",
     ...looseSkill(root),
     journalPath: path.join(root, ".one-memory", "recall-install.json"),
@@ -2706,6 +2721,7 @@ function readInstalledServer(
  * fourth copy of the merge and rollback logic.
  */
 function serverPath(layout: RecallHostLayout): string[] {
+  if (layout.serversPath !== undefined) return [...layout.serversPath];
   if (layout.format === "opencode") return ["mcp"];
   if (layout.format === "openclaw") return ["mcp", "servers"];
   return ["mcpServers"];
@@ -3348,6 +3364,14 @@ function assertLayoutIsCoherent(layout: RecallHostLayout): void {
   if (hasConfig !== (layout.format !== "none")) {
     throw new Error(
       `${layout.hostLabel} layout must use format "none" exactly when it has no config path`,
+    );
+  }
+  if (layout.serversPath !== undefined && layout.format !== "json") {
+    // Only the JSON merge takes a path; the other formats each own their
+    // document shape, and a path that no writer reads would be silently
+    // ignored right where the host's servers are looked for.
+    throw new Error(
+      `${layout.hostLabel} layout can only name a servers path with format "json"`,
     );
   }
   if (!hasConfig && layout.skillPath === null) {

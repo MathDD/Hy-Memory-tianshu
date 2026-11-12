@@ -24,8 +24,9 @@ from one_memory.imports.access import (
     AuthorizedSourceFile,
     AuthorizedSourceRoot,
 )
-from one_memory.imports.readers import read_rivet_jsonl
+from one_memory.imports.readers import read_jsonl, read_rivet_jsonl
 from one_memory.imports.sources.common import (
+    JsonlReader,
     JsonlSourceAdapter,
     ParsedMessage,
     ParsedSkip,
@@ -46,6 +47,10 @@ from one_memory.imports.adapters import (
 from one_memory.imports.models import OriginMetadata, WrittenBy
 
 _log = logging.getLogger(__name__)
+
+#: First four bytes of every zstd frame ("28 B5 2F FD"). Rivet's transcripts
+#: start with these; its plain-JSON sidecars start with ``{`` instead.
+_ZSTD_FRAME_MAGIC = b"\x28\xb5\x2f\xfd"
 
 TIANSHU_DESCRIPTOR = SourceDescriptor(
     source_id="tianshu",
@@ -86,9 +91,24 @@ class RivetSourceAdapter(JsonlSourceAdapter):
     """
 
     def _is_zstd_framed(self, source_file: AuthorizedSourceFile) -> bool:
-        return True
+        """Sniff the frame magic instead of trusting the extension.
 
-    def _reader_for(self, source_file: AuthorizedSourceFile):  # type: ignore[override]
+        Rivet writes its transcripts as zstd frames under ``.jsonl``, but the
+        same directory also holds plain-JSON sidecars (``frames.jsonl``,
+        ``cache-log.jsonl``, ``tool-result-trace.jsonl``) and the odd
+        transcript that was never compressed. A blanket ``True`` handed every
+        one of those to the zstd reader, which failed the whole scan with
+        "Unknown frame descriptor" the first time it met a plain file.
+        """
+        try:
+            with source_file.open_binary() as handle:
+                return handle.read(4) == _ZSTD_FRAME_MAGIC
+        except OSError:
+            return False
+
+    def _reader_for(self, source_file: AuthorizedSourceFile) -> JsonlReader:  # type: ignore[override]
+        if not self._is_zstd_framed(source_file):
+            return read_jsonl
         return read_rivet_jsonl
 
     def _prepare(
@@ -135,9 +155,22 @@ def create_tianshu_adapter(
         grant=grant,
         parser=parse_rivet_record,
         source_version=source_version,
-        file_predicate=lambda source_file: source_file.relative_path.name.endswith(".jsonl")
-        and not source_file.relative_path.name.endswith(".meta.json"),
+        file_predicate=_is_session_transcript,
     )
+
+
+def _is_session_transcript(source_file: AuthorizedSourceFile) -> bool:
+    """Only the per-session transcripts at the top of ``sessions/``.
+
+    ``~/.rivet/sessions`` also holds one directory per session, full of
+    plain-JSON working files (``sensorium.jsonl``, ``frames.jsonl``,
+    ``cache-log.jsonl``, ``tool-result-trace.jsonl``, ``*.claims.jsonl``) that
+    are the host's own bookkeeping, not conversations. Reading them imported
+    tool traces as dialogue, and their existence is why the scan needed a
+    depth rule rather than a suffix rule alone.
+    """
+    relative = source_file.relative_path
+    return relative.parent == Path(".") and relative.name.endswith(".jsonl")
 
 
 def parse_rivet_record(

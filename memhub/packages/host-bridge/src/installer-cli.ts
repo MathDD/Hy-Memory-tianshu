@@ -15,6 +15,7 @@ import {
   previewRecallInstall,
   qwenCodeLayout,
   type RecallHostLayout,
+  tianshuLayout,
   refuseDisabledHostOperation,
   UnsafeManagedPathError,
   verifyRecallInstall,
@@ -36,6 +37,7 @@ const HOSTS = [
   "hermes",
   "deepseek-harness",
   "pi",
+  "tianshu",
 ] as const;
 type HostId = (typeof HOSTS)[number];
 /** Arguments that stand alone rather than taking a value. */
@@ -205,6 +207,9 @@ function resolveLayout(values: Map<string, string>): RecallHostLayout {
   }
   if (host === "pi") {
     return piLayout(hostDir);
+  }
+  if (host === "tianshu") {
+    return tianshuLayout(hostDir);
   }
   if (host === "deepseek-harness") {
     // Per profile, not per host: `--profile` names which one.

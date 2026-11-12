@@ -1,6 +1,6 @@
 {
   "name": "@one-memory/web",
-  "version": "1.0.6+tianshu1",
+  "version": "1.0.6+tianshu2",
   "private": true,
   "type": "module",
   "scripts": {
