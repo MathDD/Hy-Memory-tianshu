@@ -14,6 +14,9 @@
 | 宿主 | `packages/host-bridge/src/recall-installer.ts` | 新增 `tianshuLayout`：`format:"json"` + `serversPath:["mcp","servers"]`，目标 `~/.rivet/config.json`（与 Claude Code / Codex 同一条原生安装链） |
 | 宿主 | `packages/host-bridge/src/recall-installer.ts` | `RecallHostLayout.serversPath`：JSON 配置里 server map 不在顶层 `mcpServers` 时的路径；`serverPath()` 优先读它 |
 | 宿主 | `packages/host-bridge/src/installer-cli.ts` | `HOSTS` 与 `resolveLayout` 加 `tianshu` |
+| 后端 | `apps/core/src/one_memory/call_event_recorder.py` | `HOSTS` 白名单加 `tianshu`（此前调用记录 host_id 恒为 null，页面无法归因） |
+| 后端 | `apps/core/src/one_memory/call_event_store.py` | `HostId` Literal 加 `tianshu` |
+| 后端 | `apps/core/src/one_memory/workspace_resolution.py` | `PATH_WORKSPACE_SOURCES` 加 `tianshu`（adapter 原样存 cwd） |
 | 后端 | `apps/core/src/one_memory/imports/sources/tianshu.py` | `_is_zstd_framed` 改为嗅探 `28 b5 2f fd` 魔数；`file_predicate` 只认 `sessions/` 顶层的 `<id>.jsonl`，跳过每会话子目录里的 `frames.jsonl` / `cache-log.jsonl` / `tool-result-trace.jsonl` 等宿主工作文件 |
 | 宿主 | `packages/runtime-control/src/recall-hosts.ts` | 注册 tianshu，`RIVET_HOME` 覆盖，presence `~/.rivet` |
 | 前端 | `apps/web/src/app-mark.tsx` | 图标表加 `tianshu` / `rivet` |
@@ -75,16 +78,33 @@ git rebase upstream/main   # 或 git merge upstream/main
 # 解冲突后重跑：uv sync --directory apps/core --python 3.12 && pnpm package:mac:dev
 ```
 
-## 验证记录（本机）
+## 接入步骤（与原生 host 同一条链）
 
-- `/api/v1/sources` 含 `tianshu`，display_name=「天枢」，candidate=`~/.rivet/sessions`，location_state=found
-- adapter probe：detected=true，session_count=15328，ready=true
-- 单文件 `adapter.scan()` 全链路：6 条 evidence（user/assistant/tool），role/written_by/workspace/created_at 全部正确解析自 `.meta.json`
-- 18 个顶层会话 / 201 条记录独立解析通过，0 skip
+```sh
+# 1. 安装：MemHub 写 ~/.rivet/config.json 的 mcp.servers.one-memory（tianshu 身份凭据）
+memhub host install --host tianshu            # 先预览 fingerprint
+memhub host install --host tianshu --approve <fingerprint>
+
+# 2. 授权 + 导入历史 + 开启持续同步
+memhub sources connect tianshu --import --json
+
+# 3. 重启天枢（或新开会话），让它拉起新的 MCP 进程
+```
+
+`应用详情` 里的「已冻结」来自「没有读授权 / 安装未完成」；两步做完即变成 `处理中`。
+
+## 验证记录（本机，2026-11-12）
+
+- `host status --host tianshu` → `approved`，scopes 含 `source:tianshu`
+- `sources connect tianshu --import` → `committed`；history job `stored=172`、`errors=0`、`skipped=29`
+- `memories list` 出现 12 条 `source=tianshu`，页面 `来源` 下拉出现「天枢」，「未识别来源」桶为空
+- 用安装产出的凭据手动拉起 `mcp.cjs`，`tools/list` + `MemHub_recall` 正常；`call_events.host_id = tianshu`（修复前为 null）
+- `sources list` 里 `capabilities.verification = real_replayed`
 
 ## 已知限制
 
 - **dir_fd**：本机 stock CPython 不广告 `os.open in os.supports_dir_fd`，已用运行时探测绕过（`access.py`）。若用 python.org 3.12 构建 core，静态集合本身就为真，探测自动短路。
 - **recall install**：`~/.rivet/config.json` 的 `mcp.servers` 已被证实是宿主自己也会写的普通 JSON 段，因此 tianshu 现在与原生 host 一样由 MemHub 写入 `one-memory` 条目（带 `tianshu` 身份凭据）。写入后需重启天枢（或新开一个会话）才会拉起新的 MCP 进程。
+- **旧托管运行时**：换 build 后 App 只在 `One Memory/versions` 缺目录时重新铺开。`current` 指向的目录存在但内容旧时，需把该目录挪走后重启 App，才会用新 core。
 - **历史误归类**：此前用「自定义应用」发放的 `custom-<hash>` 凭据写入的记忆，来源会被记成 `default`（页面显示「未识别来源」），换成 `tianshu` 凭据后只对**新写入**生效，旧条目不会自动改写。
 - **harness preamble**：天枢会话首条 user 消息常是 harness 注入的团队指令（origin 非 `hook`），会被当作 person 消息入库。后续可在 parser 加首条检测，或交给抽取层过滤。

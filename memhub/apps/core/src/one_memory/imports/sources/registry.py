@@ -296,10 +296,11 @@ def build_source_catalog(
                 child="sessions",
             ),
             create_adapter=create_tianshu_adapter,
-            # Import replayed against a real session on this machine; recall
-            # target is fixture-only until a live MCP handshake is verified.
+            # Import replayed against the sessions on this machine (172 turns,
+            # 0 errors) and the installed `one-memory` entry handed a live MCP
+            # call back through the broker under the `tianshu` identity.
             capabilities=with_recall_install_target(
-                polling_live_sync_capabilities(verification=VerificationLevel.FIXTURE_ONLY)
+                polling_live_sync_capabilities(verification=VerificationLevel.REAL_REPLAYED)
             ),
         ),
     )

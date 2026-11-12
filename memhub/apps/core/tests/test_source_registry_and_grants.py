@@ -42,12 +42,17 @@ def test_catalog_resolves_defaults_and_marks_environment_overrides(tmp_path) -> 
         "deepseek-harness",
         "opencode",
         "openclaw",
+        # 天枢 (Rivet): sessions in `~/.rivet/sessions`, MCP entry written by
+        # MemHub into `~/.rivet/config.json` under `mcp.servers`.
+        "tianshu",
     }
     assert catalog["qwenwork"].candidate.path == tmp_path / "home/.qwenworkcn/projects"
     assert catalog["qwen-code"].candidate.path == tmp_path / "home/.qwen/projects"
     assert catalog["claude-code"].candidate.path == tmp_path / "home/.claude/projects"
     assert catalog["codex"].candidate.path == tmp_path / "custom-codex/sessions"
     assert catalog["codex"].candidate.kind is RootCandidateKind.ENVIRONMENT_OVERRIDE
+    assert catalog["tianshu"].candidate.path == tmp_path / "home/.rivet/sessions"
+    assert catalog["tianshu"].capabilities.verification is VerificationLevel.REAL_REPLAYED
     assert catalog["cursor"].capabilities.verification is VerificationLevel.REAL_REPLAYED
     assert catalog["openclaw"].capabilities.verification is VerificationLevel.FIXTURE_ONLY
     assert catalog["cursor"].capabilities.live_sync is CapabilityState.IMPLEMENTED
@@ -135,6 +140,7 @@ def test_declarations_with_no_reader_are_named_rather_than_mistaken_for_behaviou
             "opencode",
             "pi",
             "qwen_code",
+            "tianshu",
             "workbuddy",
         )
     }
@@ -422,7 +428,7 @@ def test_exports_are_snapshots_without_changing_native_source_capabilities(tmp_p
         assert source.descriptor.capabilities.sync_completeness.value == "one_time_snapshot"
         assert not source.descriptor.capabilities.can_append
     native = {key: value for key, value in catalog.items() if key not in exports}
-    assert len(native) == 11
+    assert len(native) == 12
     assert all(
         source.descriptor.capabilities.sync_completeness.value == "additions_only"
         for source in native.values()

@@ -43,6 +43,7 @@ HostId = Literal[
     "hermes",
     "pi",
     "deepseek-harness",
+    "tianshu",
 ]
 CallTool = Literal["om_recall", "om_conversations", "om_ask", "om_matters"]
 CallState = Literal[

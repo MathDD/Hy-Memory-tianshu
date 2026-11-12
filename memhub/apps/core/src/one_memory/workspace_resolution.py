@@ -52,6 +52,7 @@ PATH_WORKSPACE_SOURCES = (
     "pi",
     "qwen-work",
     "qwen-code",
+    "tianshu",
     "workbuddy",
 )
 
