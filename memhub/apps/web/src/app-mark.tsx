@@ -24,6 +24,21 @@ export function appIconName(id: string): string | null {
   );
 }
 
+/** Icons that ship as hand-drawn SVG rather than a product export.
+ *
+ * 天枢 is not in this set: its mark is the installed app's own `icon.icns`,
+ * exported to `tianshu.png`, so the list and the detail page show the same
+ * artwork the user sees in the Dock.
+ */
+const SVG_ICONS = new Set([
+  "qwen",
+  "deepseek",
+  "hermes",
+  "openclaw",
+  "opencode",
+  "pi",
+]);
+
 export function AppMark({
   id,
   label = id,
@@ -39,7 +54,7 @@ export function AppMark({
   if (icon) {
     return (
       <img
-        src={`${import.meta.env.BASE_URL}r6/${icon}.${icon === "qwen" || ["deepseek", "hermes", "openclaw", "opencode", "pi", "tianshu"].includes(icon) ? "svg" : "png"}`}
+        src={`${import.meta.env.BASE_URL}r6/${icon}.${SVG_ICONS.has(icon) ? "svg" : "png"}`}
         width={size}
         height={size}
         alt=""

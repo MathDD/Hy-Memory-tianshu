@@ -17,8 +17,16 @@ describe("AppMark", () => {
     ["deepseek-harness", "deepseek"],
     ["openclaw", "openclaw"],
     ["qwen-code", "qwen"],
+    ["tianshu", "tianshu"],
+    ["rivet", "tianshu"],
   ])("maps %s to the approved %s asset", (sourceId, icon) => {
     expect(appIconName(sourceId)).toBe(icon);
+  });
+
+  it("uses the installed 天枢 app's own artwork, not an SVG stand-in", () => {
+    render(<AppMark id="tianshu" label="天枢" />);
+    expect(screen.getByRole("presentation", { hidden: true }).getAttribute("src"))
+      .toBe("/r6/tianshu.png");
   });
 
   it("keeps an initial fallback for an unsupported source", () => {
